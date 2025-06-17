@@ -1,0 +1,37 @@
+# Path to your oh-my-zsh installation.
+export ZSH="$HOME/.oh-my-zsh"
+
+# Set name of the theme to load
+ZSH_THEME="robbyrussell"
+
+# Enable plugins
+plugins=(
+    git             # Git integration and aliases
+    history         # History search and management
+    zsh-autosuggestions  # Fish-like autosuggestions
+    zsh-syntax-highlighting  # Fish-like syntax highlighting
+)
+
+# Load Oh My Zsh
+source $ZSH/oh-my-zsh.sh
+
+# User configuration
+export PATH=$HOME/bin:/usr/local/bin:$PATH
+
+# Enable case-insensitive completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# History configuration
+HISTSIZE=10000
+SAVEHIST=10000
+HISTFILE=~/.zsh_history
+setopt SHARE_HISTORY          # Share history between all sessions
+setopt HIST_EXPIRE_DUPS_FIRST # Delete duplicates first when HISTFILE size exceeds HISTSIZE
+setopt HIST_IGNORE_DUPS       # Don't record an entry that was just recorded again
+setopt HIST_IGNORE_ALL_DUPS   # Delete old recorded entry if new entry is a duplicate
+setopt HIST_FIND_NO_DUPS      # Do not display a line previously found
+setopt HIST_SAVE_NO_DUPS      # Don't write duplicate entries in the history file
+
+# Enable autocompletion
+autoload -Uz compinit
+compinit 
