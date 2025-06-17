@@ -19,5 +19,15 @@ if ! [ -f "$HOME/.ssh/id_rsa" ]; then
   ssh-keygen -t rsa -b 4096 -f $HOME/.ssh/id_rsa -P ""
 fi
 
-eval $(ssh-agent -s)
-ssh-add $HOME/.ssh/id_rsa
+# vim keybindings
+set -o vi
+
+# ssh agent
+if [ -f "$HOME/.ssh-agent-rc" ]; then
+  source "$HOME/.ssh-agent-rc"
+else 
+  eval $(ssh-agent -s)
+  ssh-add $HOME/.ssh/id_rsa
+fi
+
+alias s='function _s() { /workspaces/rpcpool/vault-ssh.sh "$1.rpcpool.wg"; }; _s'      
