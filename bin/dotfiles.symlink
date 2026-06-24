@@ -1,103 +1,231 @@
 #!/bin/sh
 
-walk () {
-    COMMAND="$1"
+usage() {
+    cat <<'USAGE'
+Usage: dotfiles [--dry-run] [--root PATH] <command>
 
-    find "$HOME"/.dotfiles* \
-        -path '*/.git' -prune -o \
-        -name '*.symlink' -print | while read TARGET; do
-        # For $HOME/dir1/dir2/file.symlink
-        #   WITHIN_HOME:  dir1/dir2/file.symlink
-        #   SECTION:      dir1
-        #   REST:         dir2/file.symlink
-        #   BASE_REST:    dir2/file
-        #   LINK:         $HOME/dir2/file
-        #   LINK_DIR:     $HOME/dir2
+Commands:
+  install      Link every *.symlink file into $HOME
+  uninstall    Remove links created by install
+  list         Show the source-to-target mapping
+  clean        Remove broken links that point into this dotfiles repo
 
-        WITHIN_HOME=`echo "$TARGET" | sed -e 's|^'"$HOME"'/||'`
-        SECTION=`echo "$WITHIN_HOME" | sed -e 's|/.*||'`
-        REST=`echo "$WITHIN_HOME" | sed -e 's|[^/]*/||'`
-        BASE_REST=`echo "$REST" | sed -e 's|.symlink$||'`
-        LINK="$HOME/$BASE_REST"
-        LINK_DIR=`echo "$LINK" | sed -e 's|/[^/]*$||'`
+Environment:
+  DOTFILES_ROOT  Override the repository root.
+  FULL=1         Allow uninstall to remove ~/bin/dotfiles too.
+USAGE
+}
 
-        $COMMAND
+script_dir() {
+    script=$0
+    case "$script" in
+        */*) ;;
+        *) script=$(command -v "$script") || return 1 ;;
+    esac
+
+    while [ -L "$script" ]; do
+        dir=$(CDPATH='' cd "$(dirname "$script")" && pwd -P) || return 1
+        link=$(readlink "$script") || return 1
+        case "$link" in
+            /*) script=$link ;;
+            *) script=$dir/$link ;;
+        esac
     done
+
+    CDPATH='' cd "$(dirname "$script")" && pwd -P
 }
 
-list () {
-    echo "$BASE_REST"
-    echo "  -> $TARGET"
+default_root() {
+    dir=$(script_dir) || return 1
+    CDPATH='' cd "$dir/.." && pwd -P
 }
 
-install () {
-    if [ -h "$LINK" ]; then
-        # The target is already symlinked.
-        return
+run() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        printf '[dry-run] %s\n' "$*"
+        return 0
+    fi
+
+    "$@"
+}
+
+map_target() {
+    TARGET=$1
+    case "$TARGET" in
+        "$DOTFILES_ROOT"/*) REST=${TARGET#"$DOTFILES_ROOT"/} ;;
+        *)
+            printf '[error] target outside dotfiles root: %s\n' "$TARGET" >&2
+            return 1
+            ;;
+    esac
+
+    BASE_REST=${REST%.symlink}
+    LINK=$HOME/$BASE_REST
+    LINK_DIR=$(dirname "$LINK")
+}
+
+list_one() {
+    printf '%s\n' "$BASE_REST"
+    printf '  -> %s\n' "$TARGET"
+}
+
+install_one() {
+    if [ -L "$LINK" ]; then
+        CURRENT=$(readlink "$LINK") || return 1
+        if [ "$CURRENT" = "$TARGET" ]; then
+            printf '[exists]  %s\n' "$BASE_REST"
+            return 0
+        fi
+
+        printf '[collide] %s -> %s\n' "$BASE_REST" "$CURRENT" >&2
+        return 1
     fi
 
     if [ -e "$LINK" ]; then
-        echo "[collide] $BASE_REST"
-        return
+        printf '[collide] %s\n' "$BASE_REST" >&2
+        return 1
     fi
 
-    echo "[link]    $BASE_REST"
-    mkdir -p "$LINK_DIR"
-    ln -s "$TARGET" "$LINK"
+    printf '[link]    %s\n' "$BASE_REST"
+    run mkdir -p "$LINK_DIR" || return 1
+    run ln -s "$TARGET" "$LINK"
 }
 
-uninstall () {
-    if [ -h "$LINK" ]; then
-        # As a special case, don't uninstall the dotfiles script itself
-        # unless you really ask for it by setting FULL=1.
-        if [ "$BASE_REST" = "bin/dotfiles" ]; then
-            if [ x$FULL != x1 ]; then
-                return
-            fi
+uninstall_one() {
+    if [ "$BASE_REST" = "bin/dotfiles" ] && [ "${FULL:-0}" != 1 ]; then
+        return 0
+    fi
+
+    if [ -L "$LINK" ]; then
+        CURRENT=$(readlink "$LINK") || return 1
+        if [ "$CURRENT" != "$TARGET" ]; then
+            printf '[collide] %s -> %s\n' "$BASE_REST" "$CURRENT" >&2
+            return 1
         fi
 
-        echo "[unlink]  $BASE_REST"
-        rm "$LINK"
-        # Try to remove the containing directory.  This will fail if
-        # there's other stuff there, and that's totally fine.
-        rmdir "$LINK_DIR" >/dev/null 2>&1
-        return
+        printf '[unlink]  %s\n' "$BASE_REST"
+        run rm "$LINK" || return 1
+        run rmdir "$LINK_DIR" >/dev/null 2>&1 || true
+        return 0
     fi
 
     if [ -e "$LINK" ]; then
-        echo "[collide] $BASE_REST"
-        return
+        printf '[collide] %s\n' "$BASE_REST" >&2
+        return 1
     fi
 }
 
-clean () {
-    find $HOME -type l | while read LINK; do
-        BASE_REST=`echo "$LINK" | sed -e 's|^'"$HOME"'/||'`
-        TARGET=`readlink "$LINK"`
-        if echo "$TARGET" | grep "^$HOME/\\.dotfiles" > /dev/null; then
-            if [ ! -e "$TARGET" ]; then
-                echo "[clean]   $BASE_REST"
-                rm "$LINK"
-            fi
+walk() {
+    ACTION=$1
+    TMP=${TMPDIR:-/tmp}/dotfiles.$$
+    FOUND=0
+    STATUS=0
+
+    if [ ! -d "$DOTFILES_ROOT" ]; then
+        printf '[error] dotfiles root does not exist: %s\n' "$DOTFILES_ROOT" >&2
+        return 1
+    fi
+
+    trap 'rm -f "$TMP"' EXIT HUP INT TERM
+    if ! find "$DOTFILES_ROOT" \
+        -path "$DOTFILES_ROOT/.git" -prune -o \
+        -name '*.symlink' -type f -print > "$TMP"; then
+        return 1
+    fi
+
+    while IFS= read -r TARGET; do
+        FOUND=1
+        if ! map_target "$TARGET"; then
+            STATUS=1
+            continue
         fi
-    done
+        if ! "$ACTION"; then
+            STATUS=1
+        fi
+    done < "$TMP"
+
+    if [ "$FOUND" -eq 0 ]; then
+        printf '[error] no *.symlink files found under %s\n' "$DOTFILES_ROOT" >&2
+        STATUS=1
+    fi
+
+    return "$STATUS"
 }
 
-COMMAND="$1"
+clean() {
+    TMP=${TMPDIR:-/tmp}/dotfiles-clean.$$
+    STATUS=0
+
+    trap 'rm -f "$TMP"' EXIT HUP INT TERM
+    if ! find "$HOME" -type l -print > "$TMP"; then
+        return 1
+    fi
+
+    while IFS= read -r LINK; do
+        TARGET=$(readlink "$LINK") || {
+            STATUS=1
+            continue
+        }
+
+        case "$TARGET" in
+            "$DOTFILES_ROOT"/*)
+                if [ ! -e "$TARGET" ]; then
+                    BASE_REST=${LINK#"$HOME"/}
+                    printf '[clean]   %s\n' "$BASE_REST"
+                    run rm "$LINK" || STATUS=1
+                fi
+                ;;
+        esac
+    done < "$TMP"
+
+    return "$STATUS"
+}
+
+DRY_RUN=0
+COMMAND=
+DOTFILES_ROOT=${DOTFILES_ROOT:-$(default_root)}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        -n|--dry-run)
+            DRY_RUN=1
+            ;;
+        --root)
+            shift
+            if [ "$#" -eq 0 ]; then
+                printf '[error] --root requires a path\n' >&2
+                exit 2
+            fi
+            DOTFILES_ROOT=$1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        install|uninstall|list|clean)
+            if [ -n "$COMMAND" ]; then
+                printf '[error] command specified more than once\n' >&2
+                exit 2
+            fi
+            COMMAND=$1
+            ;;
+        *)
+            printf '[error] unknown argument: %s\n' "$1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
+
 if [ -z "$COMMAND" ]; then
-    echo "Usage: dotfiles install"
-    echo "       dotfiles uninstall"
-    echo "       dotfiles list"
-    echo "       dotfiles clean"
-    exit 1
+    usage >&2
+    exit 2
 fi
 
 case "$COMMAND" in
-    list)           walk list;;
-    install)        walk install;;
-    uninstall)      walk uninstall;;
-    clean)          clean;;
-    *) echo "Unknown command $COMMAND"
-       exit 1
-       ;;
+    list) walk list_one ;;
+    install) walk install_one ;;
+    uninstall) walk uninstall_one ;;
+    clean) clean ;;
 esac

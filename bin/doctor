@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+status=0
+
+ok() {
+  printf '[ok]      %s\n' "$1"
+}
+
+warn() {
+  printf '[warn]    %s\n' "$1"
+}
+
+fail() {
+  printf '[fail]    %s\n' "$1" >&2
+  status=1
+}
+
+script_dir() {
+  local script=$0
+  case "$script" in
+    */*) ;;
+    *) script=$(command -v "$script") || return 1 ;;
+  esac
+
+  while [ -L "$script" ]; do
+    local dir link
+    dir=$(CDPATH='' cd "$(dirname "$script")" && pwd -P) || return 1
+    link=$(readlink "$script") || return 1
+    case "$link" in
+      /*) script=$link ;;
+      *) script=$dir/$link ;;
+    esac
+  done
+
+  CDPATH='' cd "$(dirname "$script")" && pwd -P
+}
+
+root_dir() {
+  local dir
+  dir=$(script_dir) || return 1
+  CDPATH='' cd "$dir/.." && pwd -P
+}
+
+run_check() {
+  local label=$1
+  shift
+
+  if "$@" >/tmp/dotfiles-doctor.out 2>/tmp/dotfiles-doctor.err; then
+    ok "$label"
+  else
+    fail "$label"
+    sed 's/^/          /' /tmp/dotfiles-doctor.err >&2
+  fi
+}
+
+ROOT=${DOTFILES_ROOT:-$(root_dir)}
+
+if [ ! -d "$ROOT" ]; then
+  fail "dotfiles root exists: $ROOT"
+  exit "$status"
+fi
+ok "dotfiles root: $ROOT"
+
+for cmd in git ssh bash sh; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    ok "command available: $cmd"
+  else
+    fail "missing command: $cmd"
+  fi
+done
+
+if command -v zsh >/dev/null 2>&1; then
+  ok "command available: zsh"
+  run_check "zsh syntax" zsh -n "$ROOT/.zshrc.symlink"
+else
+  warn "zsh is not installed"
+fi
+
+if command -v vim >/dev/null 2>&1; then
+  run_check "vimrc loads" vim -Nu "$ROOT/.vimrc.symlink" -n -es -c q
+else
+  warn "vim is not installed"
+fi
+
+if command -v shellcheck >/dev/null 2>&1; then
+  run_check "shellcheck" shellcheck \
+    "$ROOT/.bashrc.symlink" \
+    "$ROOT/.bash_profile.symlink" \
+    "$ROOT/bin/dotfiles.symlink" \
+    "$ROOT/bin/setup_zsh.sh" \
+    "$ROOT/bin/setup_ssh.sh" \
+    "$ROOT/bin/setup_vim.sh" \
+    "$ROOT/bin/doctor"
+else
+  warn "shellcheck is not installed"
+fi
+
+run_check "bash profile syntax" bash -n "$ROOT/.bash_profile.symlink"
+run_check "bashrc syntax" bash -n "$ROOT/.bashrc.symlink"
+run_check "installer syntax" sh -n "$ROOT/bin/dotfiles.symlink"
+run_check "zsh setup syntax" bash -n "$ROOT/bin/setup_zsh.sh"
+run_check "ssh setup syntax" bash -n "$ROOT/bin/setup_ssh.sh"
+run_check "vim setup syntax" bash -n "$ROOT/bin/setup_vim.sh"
+
+tmp_home=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-doctor-home.XXXXXX")
+trap 'rm -rf "$tmp_home" /tmp/dotfiles-doctor.out /tmp/dotfiles-doctor.err' EXIT
+
+if HOME="$tmp_home" DOTFILES_ROOT="$ROOT" "$ROOT/bin/dotfiles.symlink" install >/tmp/dotfiles-doctor.out 2>/tmp/dotfiles-doctor.err; then
+  ok "temp-home install"
+else
+  fail "temp-home install"
+  sed 's/^/          /' /tmp/dotfiles-doctor.err >&2
+fi
+
+if HOME="$tmp_home" ssh -G example.com -F "$tmp_home/.ssh/config" >/tmp/dotfiles-doctor.out 2>/tmp/dotfiles-doctor.err; then
+  ok "ssh config loads"
+else
+  fail "ssh config loads"
+  sed 's/^/          /' /tmp/dotfiles-doctor.err >&2
+fi
+
+if [ -d "$HOME/.oh-my-zsh" ]; then
+  zsh_custom=${ZSH_CUSTOM:-"$HOME/.oh-my-zsh/custom"}
+  [ -d "$zsh_custom/plugins/zsh-syntax-highlighting" ] || warn "missing zsh-syntax-highlighting plugin"
+else
+  warn "Oh My Zsh is not installed"
+fi
+
+exit "$status"

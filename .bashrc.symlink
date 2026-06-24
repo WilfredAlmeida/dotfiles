@@ -1,5 +1,28 @@
-# login shell load profile
-[ -n "$PS1" ] && source $HOME/.bash_profile
-# if we have a distribution bashrc
-[ -f "$HOME/.bashrc.dist" ] && source $HOME/.bashrc.dist;
+# shellcheck shell=bash
 
+case $- in
+  *i*) ;;
+  *) return ;;
+esac
+
+if [ -f "$HOME/.bashrc.dist" ]; then
+  # shellcheck source=/dev/null
+  source "$HOME/.bashrc.dist"
+fi
+
+set -o vi
+
+s() {
+  if [ "$#" -ne 1 ]; then
+    printf 'usage: s <host>\n' >&2
+    return 2
+  fi
+
+  local helper=/workspaces/rpcpool/vault-ssh.sh
+  if [ ! -x "$helper" ]; then
+    printf 's: missing executable helper: %s\n' "$helper" >&2
+    return 127
+  fi
+
+  "$helper" "$1.rpcpool.wg"
+}

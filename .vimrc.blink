@@ -23,9 +23,9 @@ set report      =0         " Always report changed lines.
 set synmaxcol   =200       " Only highlight the first 200 columns.
 
 let data_dir = expand('~/.vim')
-if empty(glob(data_dir . '/autoload/blink.vim'))
-    call mkdir(expand(data_dir."/autoload"),"p")
-    silent execute '!curl -fLo ' . data_dir . '/autoload/blink.vim --create-dirs  https://raw.githubusercontent.com/rrgeorge/vim-blink/master/blink.vim'
+if !filereadable(data_dir . '/autoload/blink.vim')
+    echoerr 'blink.vim is not installed; run bin/setup_vim.sh'
+    finish
 endif
 call blink#init()
 
