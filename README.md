@@ -18,6 +18,10 @@ workspace dotfiles. That script preserves existing Coder/devcontainer shell,
 Git, and SSH setup by merging include/source blocks instead of replacing those
 files directly.
 
+It also enables persistent bash and zsh history. History is written to
+`/persistent` when available, then `/workspaces`, then `$HOME` as a fallback.
+Set `DOTFILES_HISTORY_DIR` to override that location.
+
 Preview the links first:
 
 ```sh

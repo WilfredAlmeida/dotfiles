@@ -10,6 +10,11 @@ if [ -f "$HOME/.bashrc.dist" ]; then
   source "$HOME/.bashrc.dist"
 fi
 
+if [ -r "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh" ]; then
+  # shellcheck source=/dev/null
+  source "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh"
+fi
+
 set -o vi
 
 s() {

@@ -4,6 +4,10 @@ fi
 DOTFILES_ZSHRC_LOADED=1
 export DOTFILES_ZSHRC_LOADED
 
+if [ -r "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh" ]; then
+  source "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh"
+fi
+
 export ZSH="$HOME/.oh-my-zsh"
 
 ZSH_THEME="robbyrussell"
@@ -16,9 +20,6 @@ export PATH
 
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
 
-HISTSIZE=10000
-SAVEHIST=10000
-HISTFILE="$HOME/.zsh_history"
 setopt SHARE_HISTORY
 setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_IGNORE_DUPS

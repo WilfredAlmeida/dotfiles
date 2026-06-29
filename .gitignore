@@ -1,3 +1,4 @@
 .ssh/conf.d/*.local.config
+.bash_history
 .zcompdump*
 .zsh_history

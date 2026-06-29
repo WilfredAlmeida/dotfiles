@@ -34,6 +34,55 @@ backup_file() {
     fi
 }
 
+source_at_top() {
+    rel=$1
+    source=$2
+    target=$HOME/$rel
+    begin="# >>> dotfiles history >>>"
+    end="# <<< dotfiles history <<<"
+
+    if [ -L "$target" ]; then
+        current=$(readlink "$target") || return 1
+        case "$current" in
+            "$ROOT"/*)
+                rm "$target"
+                : > "$target"
+                ;;
+            *)
+                printf '[collide] %s -> %s\n' "$rel" "$current" >&2
+                return 1
+                ;;
+        esac
+    fi
+
+    if [ -d "$target" ]; then
+        printf '[collide] %s\n' "$rel" >&2
+        return 1
+    fi
+
+    mkdir -p "$(dirname "$target")"
+    [ -e "$target" ] || : > "$target"
+    backup_file "$target"
+
+    tmp=$(mktemp "${TMPDIR:-/tmp}/dotfiles-rc.XXXXXX") || return 1
+    {
+        printf '%s\n' "$begin"
+        printf 'if [ -r "%s" ]; then\n' "$source"
+        printf '  . "%s"\n' "$source"
+        printf 'fi\n'
+        printf '%s\n\n' "$end"
+        awk -v begin="$begin" -v end="$end" '
+            $0 == begin { skip = 1; next }
+            skip && $0 == end { skip = 0; next }
+            !skip { print }
+        ' "$target"
+    } > "$tmp"
+
+    cat "$tmp" > "$target"
+    rm -f "$tmp"
+    printf '[merge]   %s history block\n' "$rel"
+}
+
 link_file() {
     rel=$1
     source=$2
@@ -177,6 +226,8 @@ fix_ssh_permissions() {
 }
 
 "$ROOT/bin/dotfiles.symlink" install
+source_at_top .bashrc "$ROOT/shell/history.sh"
+source_at_top .zshrc "$ROOT/shell/history.sh"
 source_from_existing .bashrc "$ROOT/.bashrc.symlink"
 source_from_existing .zshrc "$ROOT/.zshrc.symlink"
 include_from_existing .gitconfig "$ROOT/.gitconfig.symlink"
