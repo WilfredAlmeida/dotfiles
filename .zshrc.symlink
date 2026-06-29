@@ -1,3 +1,9 @@
+if [ -n "${DOTFILES_ZSHRC_LOADED:-}" ]; then
+  return
+fi
+DOTFILES_ZSHRC_LOADED=1
+export DOTFILES_ZSHRC_LOADED
+
 export ZSH="$HOME/.oh-my-zsh"
 
 ZSH_THEME="robbyrussell"
@@ -25,7 +31,9 @@ plugins=(git history)
 zsh_custom="${ZSH_CUSTOM:-$ZSH/custom}"
 [ -d "$zsh_custom/plugins/zsh-syntax-highlighting" ] && plugins+=(zsh-syntax-highlighting)
 
-if [ -r "$ZSH/oh-my-zsh.sh" ]; then
+if command -v omz >/dev/null 2>&1; then
+  :
+elif [ -r "$ZSH/oh-my-zsh.sh" ]; then
   source "$ZSH/oh-my-zsh.sh"
 else
   autoload -Uz compinit

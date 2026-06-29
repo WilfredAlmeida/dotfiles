@@ -87,6 +87,7 @@ if command -v shellcheck >/dev/null 2>&1; then
   run_check "shellcheck" shellcheck \
     "$ROOT/.bashrc.symlink" \
     "$ROOT/.bash_profile.symlink" \
+    "$ROOT/install.sh" \
     "$ROOT/bin/dotfiles.symlink" \
     "$ROOT/bin/setup_zsh.sh" \
     "$ROOT/bin/setup_ssh.sh" \
@@ -98,6 +99,7 @@ fi
 
 run_check "bash profile syntax" bash -n "$ROOT/.bash_profile.symlink"
 run_check "bashrc syntax" bash -n "$ROOT/.bashrc.symlink"
+run_check "coder installer syntax" sh -n "$ROOT/install.sh"
 run_check "installer syntax" sh -n "$ROOT/bin/dotfiles.symlink"
 run_check "zsh setup syntax" bash -n "$ROOT/bin/setup_zsh.sh"
 run_check "ssh setup syntax" bash -n "$ROOT/bin/setup_ssh.sh"

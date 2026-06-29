@@ -12,6 +12,7 @@ Commands:
 
 Environment:
   DOTFILES_ROOT  Override the repository root.
+  DOTFILES_SKIP  Space-separated installed paths to skip, e.g. ".ssh/config".
   FULL=1         Allow uninstall to remove ~/bin/dotfiles too.
 USAGE
 }
@@ -67,6 +68,13 @@ map_target() {
 list_one() {
     printf '%s\n' "$BASE_REST"
     printf '  -> %s\n' "$TARGET"
+}
+
+is_skipped() {
+    case " ${DOTFILES_SKIP:-} " in
+        *" $BASE_REST "*) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 install_one() {
@@ -137,6 +145,10 @@ walk() {
         FOUND=1
         if ! map_target "$TARGET"; then
             STATUS=1
+            continue
+        fi
+        if is_skipped; then
+            printf '[skip]    %s\n' "$BASE_REST"
             continue
         fi
         if ! "$ACTION"; then

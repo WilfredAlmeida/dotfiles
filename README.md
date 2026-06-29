@@ -13,6 +13,11 @@ bin/dotfiles.symlink -> ~/bin/dotfiles
 
 ## Install
 
+Coder runs the top-level `install.sh` automatically when applying this repo as
+workspace dotfiles. That script preserves existing Coder/devcontainer shell,
+Git, and SSH setup by merging include/source blocks instead of replacing those
+files directly.
+
 Preview the links first:
 
 ```sh
