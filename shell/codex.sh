@@ -2,7 +2,7 @@
 
 if [ -n "${DOTFILES_CODEX_HOME:-}" ]; then
   CODEX_HOME=$DOTFILES_CODEX_HOME
-elif [ -d /persistent ]; then
+elif mkdir -p /persistent/.codex 2>/dev/null && [ -w /persistent/.codex ]; then
   CODEX_HOME=/persistent/.codex
 else
   CODEX_HOME=$HOME/.codex

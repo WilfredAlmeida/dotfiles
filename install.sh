@@ -88,7 +88,7 @@ source_at_top() {
 codex_home_path() {
     if [ -n "${DOTFILES_CODEX_HOME:-}" ]; then
         printf '%s\n' "$DOTFILES_CODEX_HOME"
-    elif [ -d /persistent ]; then
+    elif mkdir -p /persistent/.codex 2>/dev/null && [ -w /persistent/.codex ]; then
         printf '%s\n' /persistent/.codex
     else
         printf '%s\n' "$HOME/.codex"
@@ -152,7 +152,7 @@ install_codex() {
     elif [ -e "$rust_skills" ]; then
         printf '[warn]    Codex rust skills path exists and is not a git repo: %s\n' "$rust_skills" >&2
     else
-        if git clone --depth=1 https://github.com/leonardomso/rust-skills.git "$rust_skills" >/dev/null 2>&1; then
+        if git clone --depth=1 https://github.com/WilfredAlmeida/rust-skills.git "$rust_skills" >/dev/null 2>&1; then
             printf '[link]    Codex rust skills\n'
         else
             printf '[warn]    failed to clone Codex rust skills into %s\n' "$rust_skills" >&2
