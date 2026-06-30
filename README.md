@@ -22,13 +22,26 @@ It also enables persistent bash and zsh history. History is written to
 `/persistent` when available, then `/workspaces`, then `$HOME` as a fallback.
 Set `DOTFILES_HISTORY_DIR` to override that location.
 
-Codex setup is installed from dotfiles too. `CODEX_HOME` points at
-`/persistent/.codex` when `/persistent` exists, otherwise `$HOME/.codex`. Set
-`DOTFILES_CODEX_HOME` to override that location. The installer writes
-`codex/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, sets `sandbox_mode =
-"workspace-write"` and `approval_policy = "on-request"` in
-`$CODEX_HOME/config.toml`, and installs the Rust skill under
-`$CODEX_HOME/skills/rust-skills`.
+Agent instructions and skills are installed from dotfiles too. The repo keeps
+one universal instructions file at `agents/AGENTS.md` that applies to every LLM
+CLI, plus per-model override dirs `agents/codex/` and `agents/claude/` for
+anything model-specific. At install time the universal file is written under
+whatever filename each model reads natively, so it works with no extra config:
+
+- **Codex** — `CODEX_HOME` points at `/persistent/.codex` when it is writable,
+  otherwise `$HOME/.codex` (override with `DOTFILES_CODEX_HOME`). The installer
+  writes `agents/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, overlays
+  `agents/codex/`, sets `sandbox_mode = "workspace-write"` and
+  `approval_policy = "on-request"` in `$CODEX_HOME/config.toml`, and installs
+  the Rust skill under `$CODEX_HOME/skills/rust-skills`.
+- **Claude** — `CLAUDE_CONFIG_DIR` points at `/persistent/.claude` when it is
+  writable, otherwise `$HOME/.claude` (override with `DOTFILES_CLAUDE_HOME`).
+  The installer writes `agents/AGENTS.md` to `$CLAUDE_HOME/CLAUDE.md`, overlays
+  `agents/claude/`, and installs the Rust skill under
+  `$CLAUDE_HOME/skills/rust-skills`.
+
+Files placed in a model's override dir are copied verbatim into that model's
+home and win over the universal file when names collide.
 
 Preview the links first:
 

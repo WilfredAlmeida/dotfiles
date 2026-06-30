@@ -95,6 +95,68 @@ codex_home_path() {
     fi
 }
 
+claude_home_path() {
+    if [ -n "${DOTFILES_CLAUDE_HOME:-}" ]; then
+        printf '%s\n' "$DOTFILES_CLAUDE_HOME"
+    elif mkdir -p /persistent/.claude 2>/dev/null && [ -w /persistent/.claude ]; then
+        printf '%s\n' /persistent/.claude
+    else
+        printf '%s\n' "$HOME/.claude"
+    fi
+}
+
+# Copy the contents of a per-model overrides dir (agents/<model>/) into the
+# model home, overwriting the universal file when names collide. The .gitkeep
+# placeholder is skipped, and an empty dir is a no-op.
+overlay_agent_dir() {
+    src=$1
+    dest=$2
+
+    [ -d "$src" ] || return 0
+
+    found=0
+    for entry in "$src"/* "$src"/.[!.]*; do
+        [ -e "$entry" ] || continue
+        case "$(basename "$entry")" in
+            .gitkeep) continue ;;
+        esac
+        cp -R "$entry" "$dest/"
+        found=1
+    done
+
+    [ "$found" -eq 1 ] && printf '[merge]   %s overrides\n' "$(basename "$src")"
+    return 0
+}
+
+# Clone a skills repo if missing, fast-forward it if already present. Network
+# and state problems are non-fatal warnings, never errors.
+clone_or_update_skills() {
+    dest=$1
+    url=$2
+    label=$3
+
+    if ! command -v git >/dev/null 2>&1; then
+        printf '[warn]    missing git; skipped %s\n' "$label" >&2
+        return 0
+    fi
+
+    if [ -d "$dest/.git" ]; then
+        if git -C "$dest" pull --ff-only >/dev/null 2>&1; then
+            printf '[exists]  %s updated\n' "$label"
+        else
+            printf '[warn]    failed to update %s at %s\n' "$label" "$dest" >&2
+        fi
+    elif [ -e "$dest" ]; then
+        printf '[warn]    %s path exists and is not a git repo: %s\n' "$label" "$dest" >&2
+    else
+        if git clone --depth=1 "$url" "$dest" >/dev/null 2>&1; then
+            printf '[link]    %s\n' "$label"
+        else
+            printf '[warn]    failed to clone %s into %s\n' "$label" "$dest" >&2
+        fi
+    fi
+}
+
 write_codex_config() {
     config=$CODEX_HOME/config.toml
     tmp=$(mktemp "${TMPDIR:-/tmp}/codex-config.XXXXXX") || return 1
@@ -129,35 +191,26 @@ write_codex_config() {
     rm -f "$tmp"
 }
 
+RUST_SKILLS_URL=https://github.com/WilfredAlmeida/rust-skills.git
+
 install_codex() {
     CODEX_HOME=$(codex_home_path)
     export CODEX_HOME
 
     mkdir -p "$CODEX_HOME/skills"
-    cp "$ROOT/codex/AGENTS.md" "$CODEX_HOME/AGENTS.md"
+    cp "$ROOT/agents/AGENTS.md" "$CODEX_HOME/AGENTS.md"
+    overlay_agent_dir "$ROOT/agents/codex" "$CODEX_HOME"
     write_codex_config
+    clone_or_update_skills "$CODEX_HOME/skills/rust-skills" "$RUST_SKILLS_URL" "Codex rust skills"
+}
 
-    rust_skills=$CODEX_HOME/skills/rust-skills
-    if ! command -v git >/dev/null 2>&1; then
-        printf '[warn]    missing git; skipped Codex rust skills\n' >&2
-        return 0
-    fi
+install_claude() {
+    CLAUDE_HOME=$(claude_home_path)
 
-    if [ -d "$rust_skills/.git" ]; then
-        if git -C "$rust_skills" pull --ff-only >/dev/null 2>&1; then
-            printf '[exists]  Codex rust skills updated\n'
-        else
-            printf '[warn]    failed to update Codex rust skills at %s\n' "$rust_skills" >&2
-        fi
-    elif [ -e "$rust_skills" ]; then
-        printf '[warn]    Codex rust skills path exists and is not a git repo: %s\n' "$rust_skills" >&2
-    else
-        if git clone --depth=1 https://github.com/WilfredAlmeida/rust-skills.git "$rust_skills" >/dev/null 2>&1; then
-            printf '[link]    Codex rust skills\n'
-        else
-            printf '[warn]    failed to clone Codex rust skills into %s\n' "$rust_skills" >&2
-        fi
-    fi
+    mkdir -p "$CLAUDE_HOME/skills"
+    cp "$ROOT/agents/AGENTS.md" "$CLAUDE_HOME/CLAUDE.md"
+    overlay_agent_dir "$ROOT/agents/claude" "$CLAUDE_HOME"
+    clone_or_update_skills "$CLAUDE_HOME/skills/rust-skills" "$RUST_SKILLS_URL" "Claude rust skills"
 }
 
 link_file() {
@@ -307,7 +360,10 @@ source_at_top .bashrc "$ROOT/shell/history.sh" history
 source_at_top .zshrc "$ROOT/shell/history.sh" history
 source_at_top .bashrc "$ROOT/shell/codex.sh" codex
 source_at_top .zshrc "$ROOT/shell/codex.sh" codex
+source_at_top .bashrc "$ROOT/shell/claude.sh" claude
+source_at_top .zshrc "$ROOT/shell/claude.sh" claude
 install_codex
+install_claude
 source_from_existing .bashrc "$ROOT/.bashrc.symlink"
 source_from_existing .zshrc "$ROOT/.zshrc.symlink"
 include_from_existing .gitconfig "$ROOT/.gitconfig.symlink"
