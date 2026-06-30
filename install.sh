@@ -213,6 +213,22 @@ install_claude() {
     clone_or_update_skills "$CLAUDE_HOME/skills/rust-skills" "$RUST_SKILLS_URL" "Claude rust skills"
 }
 
+install_git_hooks() {
+    hooks_dir=$ROOT/git/hooks
+
+    if [ ! -x "$hooks_dir/dispatch" ]; then
+        chmod +x "$hooks_dir/dispatch" 2>/dev/null || true
+    fi
+
+    if ! command -v git >/dev/null 2>&1; then
+        printf '[warn]    missing git; skipped global hooks path\n' >&2
+        return 0
+    fi
+
+    git config --global core.hooksPath "$hooks_dir"
+    printf '[merge]   git core.hooksPath -> %s\n' "$hooks_dir"
+}
+
 link_file() {
     rel=$1
     source=$2
@@ -364,6 +380,7 @@ source_at_top .bashrc "$ROOT/shell/claude.sh" claude
 source_at_top .zshrc "$ROOT/shell/claude.sh" claude
 install_codex
 install_claude
+install_git_hooks
 source_from_existing .bashrc "$ROOT/.bashrc.symlink"
 source_from_existing .zshrc "$ROOT/.zshrc.symlink"
 include_from_existing .gitconfig "$ROOT/.gitconfig.symlink"

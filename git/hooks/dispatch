@@ -1,0 +1,97 @@
+#!/bin/sh
+# Global git hook dispatcher installed via core.hooksPath.
+#
+# For every hook it first delegates to the repo-local hook of the same name
+# (preserving args, stdin, and exit code) so per-repo tooling such as the
+# pre-commit framework keeps working. For post-commit it additionally offers to
+# push the new commit to the current branch's upstream.
+set -u
+
+name=$(basename "$0")
+
+git_dir=$(git rev-parse --git-dir 2>/dev/null) || git_dir=
+local_hook=
+if [ -n "$git_dir" ]; then
+    local_hook=$git_dir/hooks/$name
+fi
+
+# Recursion guard: never delegate to ourselves.
+self=$0
+case "$self" in
+    /*) self_abs=$self ;;
+    *) self_abs=$(pwd)/$self ;;
+esac
+if [ -n "$local_hook" ] && [ "$local_hook" = "$self_abs" ]; then
+    local_hook=
+fi
+
+run_local_hook() {
+    [ -n "$local_hook" ] && [ -x "$local_hook" ]
+}
+
+if [ "$name" != "post-commit" ]; then
+    # Transparent pass-through for every other hook.
+    if run_local_hook; then
+        exec "$local_hook" "$@"
+    fi
+    exit 0
+fi
+
+# post-commit: run the local hook first (its exit code is ignored by git),
+# then offer to push.
+if run_local_hook; then
+    "$local_hook" "$@" || true
+fi
+
+push_prompt() {
+    # Explicit opt-out.
+    [ -n "${DOTFILES_NO_PUSH_PROMPT:-}" ] && return 0
+
+    # Need a usable controlling terminal. post-commit runs with stdin on
+    # /dev/null, so probe /dev/tty directly; skip for IDE/GUI/CI/scripted
+    # commits where it can't be opened.
+    if ! { exec 3<>/dev/tty; } 2>/dev/null; then
+        return 0
+    fi
+
+    # Don't prompt in the middle of a bulk-commit operation.
+    if [ -n "$git_dir" ]; then
+        for marker in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD; do
+            if [ -e "$git_dir/$marker" ]; then
+                exec 3>&- 3<&-
+                return 0
+            fi
+        done
+    fi
+
+    branch=$(git symbolic-ref --short -q HEAD) || branch=
+    if [ -z "$branch" ]; then
+        # Detached HEAD: nothing to push.
+        exec 3>&- 3<&-
+        return 0
+    fi
+
+    upstream=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null) || upstream=
+    if [ -z "$upstream" ]; then
+        printf "dotfiles: no upstream set for '%s'; set it and push manually\n" "$branch" >&3
+        exec 3>&- 3<&-
+        return 0
+    fi
+
+    printf 'Push %s to %s? [y/N] ' "$branch" "$upstream" >&3
+    reply=
+    IFS= read -r reply <&3 || reply=
+    exec 3>&- 3<&-
+
+    case "$reply" in
+        y | Y | yes | Yes | YES)
+            git push
+            ;;
+        *)
+            : # declined
+            ;;
+    esac
+}
+
+push_prompt
+exit 0

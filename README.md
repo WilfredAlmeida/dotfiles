@@ -43,6 +43,21 @@ whatever filename each model reads natively, so it works with no extra config:
 Files placed in a model's override dir are copied verbatim into that model's
 home and win over the universal file when names collide.
 
+The installer also sets a global `core.hooksPath` to `git/hooks/`, which adds a
+post-commit prompt: after every `git commit` in any repo, it asks whether to
+push the new commit to the current branch's upstream. Answering `y` runs
+`git push`; anything else (including a bare Enter) does nothing. If the branch
+has no upstream it logs an error and does not push, so you can set the upstream
+yourself. The prompt only appears for interactive terminal commits — IDE, GUI,
+CI, and scripted commits are skipped — and it is suppressed mid
+rebase/merge/cherry-pick and on a detached HEAD. Set `DOTFILES_NO_PUSH_PROMPT`
+to any non-empty value to silence it for a commit or session.
+
+Because `core.hooksPath` is global, the hooks directory holds a dispatcher that
+first runs each repo's local `.git/hooks/<name>` (preserving arguments, stdin,
+and exit codes) before layering on the push prompt, so per-repo tooling such as
+the `pre-commit` framework keeps working.
+
 Preview the links first:
 
 ```sh
