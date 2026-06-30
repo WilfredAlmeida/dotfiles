@@ -1,4 +1,4 @@
-# shellcheck shell=sh disable=SC3044
+# shellcheck shell=sh disable=SC2317,SC3044
 # Sourced by bash and zsh startup files. Keep this POSIX-friendly; shell-specific
 # history options are guarded below.
 

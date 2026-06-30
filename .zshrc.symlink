@@ -4,6 +4,10 @@ fi
 DOTFILES_ZSHRC_LOADED=1
 export DOTFILES_ZSHRC_LOADED
 
+if [ -r "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/codex.sh" ]; then
+  source "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/codex.sh"
+fi
+
 if [ -r "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh" ]; then
   source "${DOTFILES_ROOT:-$HOME/.config/coderv2/dotfiles}/shell/history.sh"
 fi

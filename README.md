@@ -22,6 +22,14 @@ It also enables persistent bash and zsh history. History is written to
 `/persistent` when available, then `/workspaces`, then `$HOME` as a fallback.
 Set `DOTFILES_HISTORY_DIR` to override that location.
 
+Codex setup is installed from dotfiles too. `CODEX_HOME` points at
+`/persistent/.codex` when `/persistent` exists, otherwise `$HOME/.codex`. Set
+`DOTFILES_CODEX_HOME` to override that location. The installer writes
+`codex/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, sets `sandbox_mode =
+"workspace-write"` and `approval_policy = "on-request"` in
+`$CODEX_HOME/config.toml`, and installs the Rust skill under
+`$CODEX_HOME/skills/rust-skills`.
+
 Preview the links first:
 
 ```sh

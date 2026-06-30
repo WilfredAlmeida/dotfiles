@@ -37,9 +37,10 @@ backup_file() {
 source_at_top() {
     rel=$1
     source=$2
+    label=$3
     target=$HOME/$rel
-    begin="# >>> dotfiles history >>>"
-    end="# <<< dotfiles history <<<"
+    begin="# >>> dotfiles $label >>>"
+    end="# <<< dotfiles $label <<<"
 
     if [ -L "$target" ]; then
         current=$(readlink "$target") || return 1
@@ -80,7 +81,83 @@ source_at_top() {
 
     cat "$tmp" > "$target"
     rm -f "$tmp"
-    printf '[merge]   %s history block\n' "$rel"
+    printf '[merge]   %s %s block\n' "$rel" "$label"
+}
+
+
+codex_home_path() {
+    if [ -n "${DOTFILES_CODEX_HOME:-}" ]; then
+        printf '%s\n' "$DOTFILES_CODEX_HOME"
+    elif [ -d /persistent ]; then
+        printf '%s\n' /persistent/.codex
+    else
+        printf '%s\n' "$HOME/.codex"
+    fi
+}
+
+write_codex_config() {
+    config=$CODEX_HOME/config.toml
+    tmp=$(mktemp "${TMPDIR:-/tmp}/codex-config.XXXXXX") || return 1
+
+    if [ -e "$config" ]; then
+        awk '
+            BEGIN { inserted = 0; in_table = 0 }
+            !inserted && /^[[:space:]]*\[/ {
+                print "sandbox_mode = \"workspace-write\""
+                print "approval_policy = \"on-request\""
+                print ""
+                inserted = 1
+                in_table = 1
+            }
+            !in_table && /^[[:space:]]*(sandbox_mode|approval_policy)[[:space:]]*=/ { next }
+            { print }
+            END {
+                if (!inserted) {
+                    print "sandbox_mode = \"workspace-write\""
+                    print "approval_policy = \"on-request\""
+                }
+            }
+        ' "$config" > "$tmp"
+    else
+        {
+            printf '%s\n' 'sandbox_mode = "workspace-write"'
+            printf '%s\n' 'approval_policy = "on-request"'
+        } > "$tmp"
+    fi
+
+    cat "$tmp" > "$config"
+    rm -f "$tmp"
+}
+
+install_codex() {
+    CODEX_HOME=$(codex_home_path)
+    export CODEX_HOME
+
+    mkdir -p "$CODEX_HOME/skills"
+    cp "$ROOT/codex/AGENTS.md" "$CODEX_HOME/AGENTS.md"
+    write_codex_config
+
+    rust_skills=$CODEX_HOME/skills/rust-skills
+    if ! command -v git >/dev/null 2>&1; then
+        printf '[warn]    missing git; skipped Codex rust skills\n' >&2
+        return 0
+    fi
+
+    if [ -d "$rust_skills/.git" ]; then
+        if git -C "$rust_skills" pull --ff-only >/dev/null 2>&1; then
+            printf '[exists]  Codex rust skills updated\n'
+        else
+            printf '[warn]    failed to update Codex rust skills at %s\n' "$rust_skills" >&2
+        fi
+    elif [ -e "$rust_skills" ]; then
+        printf '[warn]    Codex rust skills path exists and is not a git repo: %s\n' "$rust_skills" >&2
+    else
+        if git clone --depth=1 https://github.com/leonardomso/rust-skills.git "$rust_skills" >/dev/null 2>&1; then
+            printf '[link]    Codex rust skills\n'
+        else
+            printf '[warn]    failed to clone Codex rust skills into %s\n' "$rust_skills" >&2
+        fi
+    fi
 }
 
 link_file() {
@@ -226,8 +303,11 @@ fix_ssh_permissions() {
 }
 
 "$ROOT/bin/dotfiles.symlink" install
-source_at_top .bashrc "$ROOT/shell/history.sh"
-source_at_top .zshrc "$ROOT/shell/history.sh"
+source_at_top .bashrc "$ROOT/shell/history.sh" history
+source_at_top .zshrc "$ROOT/shell/history.sh" history
+source_at_top .bashrc "$ROOT/shell/codex.sh" codex
+source_at_top .zshrc "$ROOT/shell/codex.sh" codex
+install_codex
 source_from_existing .bashrc "$ROOT/.bashrc.symlink"
 source_from_existing .zshrc "$ROOT/.zshrc.symlink"
 include_from_existing .gitconfig "$ROOT/.gitconfig.symlink"
