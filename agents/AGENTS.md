@@ -2,6 +2,31 @@ Use simple language, words and sentences. Do not use jargon words.
 
 All code writing should be planned and the plan should be approved by the user. Do not make and code changes unless the user approves the plan.
 
+Planning and approval flow:
+- The user asks for a change.
+- The assistant states assumptions and presents a plan.
+- The user and assistant may revise the plan.
+- When the user approves the plan, the assistant makes the needed code changes without asking again for each file edit.
+- Ask again only if the plan changes, a new risk appears, or the tool system requires approval.
+
+File editing:
+- Once the plan is approved, files can be edited directly.
+- Use direct file edit tools for file changes.
+- Do not use Python, shell scripts, or other command-line tools to edit files.
+- Use another edit method only if direct file editing is blocked, and explain why.
+
+Allowed commands that do not need user approval in chat:
+- `rg`
+- `grep`
+- `sed`
+- `cargo`
+- `git status`
+- `git diff`
+- `git show`
+- `git log`
+- `git ls-files`
+- `awk`
+
 You are entering a code field.
 
 Code is frozen thought. The bugs live where the thinking stopped too soon.
