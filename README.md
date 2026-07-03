@@ -22,13 +22,41 @@ It also enables persistent bash and zsh history. History is written to
 `/persistent` when available, then `/workspaces`, then `$HOME` as a fallback.
 Set `DOTFILES_HISTORY_DIR` to override that location.
 
-Codex setup is installed from dotfiles too. `CODEX_HOME` points at
-`/persistent/.codex` when `/persistent` exists, otherwise `$HOME/.codex`. Set
-`DOTFILES_CODEX_HOME` to override that location. The installer writes
-`codex/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, sets `sandbox_mode =
-"workspace-write"` and `approval_policy = "on-request"` in
-`$CODEX_HOME/config.toml`, and installs the Rust skill under
-`$CODEX_HOME/skills/rust-skills`.
+Agent instructions and skills are installed from dotfiles too. The repo keeps
+one universal instructions file at `agents/AGENTS.md` that applies to every LLM
+CLI, plus per-model override dirs `agents/codex/` and `agents/claude/` for
+anything model-specific. At install time the universal file is written under
+whatever filename each model reads natively, so it works with no extra config:
+
+- **Codex** — `CODEX_HOME` points at `/persistent/.codex` when it is writable,
+  otherwise `$HOME/.codex` (override with `DOTFILES_CODEX_HOME`). The installer
+  writes `agents/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, overlays
+  `agents/codex/`, sets `sandbox_mode = "workspace-write"` and
+  `approval_policy = "on-request"` in `$CODEX_HOME/config.toml`, and installs
+  the Rust skill under `$CODEX_HOME/skills/rust-skills`.
+- **Claude** — `CLAUDE_CONFIG_DIR` points at `/persistent/.claude` when it is
+  writable, otherwise `$HOME/.claude` (override with `DOTFILES_CLAUDE_HOME`).
+  The installer writes `agents/AGENTS.md` to `$CLAUDE_HOME/CLAUDE.md`, overlays
+  `agents/claude/`, and installs the Rust skill under
+  `$CLAUDE_HOME/skills/rust-skills`.
+
+Files placed in a model's override dir are copied verbatim into that model's
+home and win over the universal file when names collide.
+
+The installer also sets a global `core.hooksPath` to `git/hooks/`, which adds a
+post-commit prompt: after every `git commit` in any repo, it asks whether to
+push the new commit to the current branch's upstream. Answering `y` runs
+`git push`; anything else (including a bare Enter) does nothing. If the branch
+has no upstream it logs an error and does not push, so you can set the upstream
+yourself. The prompt only appears for interactive terminal commits — IDE, GUI,
+CI, and scripted commits are skipped — and it is suppressed mid
+rebase/merge/cherry-pick and on a detached HEAD. Set `DOTFILES_NO_PUSH_PROMPT`
+to any non-empty value to silence it for a commit or session.
+
+Because `core.hooksPath` is global, the hooks directory holds a dispatcher that
+first runs each repo's local `.git/hooks/<name>` (preserving arguments, stdin,
+and exit codes) before layering on the push prompt, so per-repo tooling such as
+the `pre-commit` framework keeps working.
 
 Preview the links first:
 
