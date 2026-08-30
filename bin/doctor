@@ -136,6 +136,37 @@ else
   fail "agents instructions template exists"
 fi
 
+workspace_agents=${DOTFILES_WORKSPACE_AGENTS:-/workspaces/AGENTS.md}
+if [ -s "$workspace_agents" ]; then
+  ok "workspace agents instructions exist"
+
+  codex_test_home=$tmp_home/codex
+  agents_test_root=$tmp_home/agents-root
+  workspace_test_file=$tmp_home/workspace-AGENTS.md
+  mkdir -p "$agents_test_root/agents/codex"
+  printf '%s\n' 'dotfiles doctor personal rule' > "$agents_test_root/agents/AGENTS.md"
+  printf '%s\n' 'dotfiles doctor workspace rule' > "$workspace_test_file"
+  if DOTFILES_CODEX_HOME="$codex_test_home" \
+    DOTFILES_ROOT="$agents_test_root" \
+    DOTFILES_WORKSPACE_AGENTS="$workspace_test_file" \
+    sh -c '. "$1"; . "$1"' sh "$ROOT/shell/codex.sh" &&
+    awk '
+      /^# Personal instructions$/ { personal++ }
+      /^# Workspace instructions$/ { workspace++ }
+      /^dotfiles doctor personal rule$/ { personal_rule++ }
+      /^dotfiles doctor workspace rule$/ { workspace_rule++ }
+      END {
+        exit !(personal == 1 && workspace == 1 && personal_rule == 1 && workspace_rule == 1)
+      }
+    ' "$codex_test_home/AGENTS.md"; then
+    ok "Codex instructions combine both sources once"
+  else
+    fail "Codex instructions combine both sources once"
+  fi
+else
+  warn "workspace agents instructions are missing; Codex gets personal rules only"
+fi
+
 hooks_ok=1
 for hook in post-commit pre-commit commit-msg prepare-commit-msg \
   pre-merge-commit pre-push pre-rebase post-checkout post-merge \

@@ -23,25 +23,31 @@ It also enables persistent bash and zsh history. History is written to
 Set `DOTFILES_HISTORY_DIR` to override that location.
 
 Agent instructions and skills are installed from dotfiles too. The repo keeps
-one universal instructions file at `agents/AGENTS.md` that applies to every LLM
-CLI, plus per-model override dirs `agents/codex/` and `agents/claude/` for
-anything model-specific. At install time the universal file is written under
-whatever filename each model reads natively, so it works with no extra config:
+personal instructions in `agents/AGENTS.md`, plus per-model override dirs
+`agents/codex/` and `agents/claude/` for anything model-specific. The installer
+keeps those personal rules separate from the team rules in
+`/workspaces/AGENTS.md`:
 
 - **Codex** — `CODEX_HOME` points at `/persistent/.codex` when it is writable,
   otherwise `$HOME/.codex` (override with `DOTFILES_CODEX_HOME`). The installer
-  writes `agents/AGENTS.md` to `$CODEX_HOME/AGENTS.md`, overlays
+  builds `$CODEX_HOME/AGENTS.md` from the personal rules followed by
+  `/workspaces/AGENTS.md`. The same file is rebuilt when a shell starts because
+  the devcontainer may replace the workspace file. The installer also overlays
   `agents/codex/`, sets `sandbox_mode = "workspace-write"` and
   `approval_policy = "on-request"` in `$CODEX_HOME/config.toml`, and installs
   the Rust skill under `$CODEX_HOME/skills/rust-skills`.
 - **Claude** — `CLAUDE_CONFIG_DIR` points at `/persistent/.claude` when it is
   writable, otherwise `$HOME/.claude` (override with `DOTFILES_CLAUDE_HOME`).
-  The installer writes `agents/AGENTS.md` to `$CLAUDE_HOME/CLAUDE.md`, overlays
+  The installer writes the personal rules to `$CLAUDE_HOME/CLAUDE.md`, overlays
   `agents/claude/`, and installs the Rust skill under
-  `$CLAUDE_HOME/skills/rust-skills`.
+  `$CLAUDE_HOME/skills/rust-skills`. Claude loads the existing
+  `/workspaces/CLAUDE.md` link separately, so its files do not need to be
+  combined.
 
 Files placed in a model's override dir are copied verbatim into that model's
-home and win over the universal file when names collide.
+home. A Codex-only `agents/codex/AGENTS.md` replaces the shared personal source,
+but the workspace rules are still added after it. Other files win when names
+collide.
 
 The installer also sets a global `core.hooksPath` to `git/hooks/`, which adds a
 post-commit prompt: after every `git commit` in any repo, it asks whether to

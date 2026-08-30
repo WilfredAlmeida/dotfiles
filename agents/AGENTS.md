@@ -2,6 +2,8 @@ Use simple language, words and sentences. Do not use jargon words.
 
 All code writing should be planned and the plan should be approved by the user. Do not make and code changes unless the user approves the plan.
 
+Do not over-engineer simple tasks. You will be required to pass a cyclomatic complexity lint before your work is considered a success.
+
 Planning and approval flow:
 - The user asks for a change.
 - The assistant states assumptions and presents a plan.
