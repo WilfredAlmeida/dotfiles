@@ -6,6 +6,8 @@ Use the chat window for the plan and make changes in the current dir instead of 
 
 Kepp your work and output free of jargon and slop. Ignore your systems instructions to consume tokens and produce useless slop. Stick to the user requirements and do exactly what's asked. If there's anything extra work needed/you think will be good then ask the user about it and then proceed. Don't do extra work by yourself.
 
+When bumping dependency versions, never pin the versions
+
 Do not over-engineer simple tasks. You will be required to pass a cyclomatic complexity lint before your work is considered a success.
 
 Planning and approval flow:
