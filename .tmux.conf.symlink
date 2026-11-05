@@ -4,6 +4,9 @@ set -g set-clipboard on
 set -as terminal-features ',xterm*:clipboard'
 setw -g mode-keys emacs
 
+# Start zsh in new panes when it is installed.
+if-shell "command -v zsh" "set -g default-command zsh"
+
 # Mouse drag copies and keeps the highlight in place; a click clears it.
 bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-no-clear
 bind -T copy-mode MouseDown1Pane select-pane \; send-keys -X clear-selection
