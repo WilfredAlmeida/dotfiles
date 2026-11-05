@@ -1,0 +1,36 @@
+set -g mouse on
+set -g history-limit 100000
+set -g set-clipboard on
+set -as terminal-features ',xterm*:clipboard'
+setw -g mode-keys emacs
+
+# Mouse drag copies and keeps the highlight in place; a click clears it.
+bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-no-clear
+bind -T copy-mode MouseDown1Pane select-pane \; send-keys -X clear-selection
+
+# Full 24-bit color in the VS Code terminal.
+set -as terminal-features ',xterm*:RGB'
+
+# No delay after Esc; pass focus changes to programs.
+set -sg escape-time 0
+set -g focus-events on
+
+# New panes and windows open in the current pane's folder.
+bind '"' split-window -v -c "#{pane_current_path}"
+bind % split-window -h -c "#{pane_current_path}"
+bind c new-window -c "#{pane_current_path}"
+
+# Number windows and panes from 1 and close gaps.
+set -g base-index 1
+setw -g pane-base-index 1
+set -g renumber-windows on
+
+# prefix + N makes a session; prefix + X kills the current one.
+bind N command-prompt -p "new session name:" { new-session -s "%%" -c "#{pane_current_path}" }
+bind X confirm-before -p "kill session #S? (y/n)" kill-session
+
+# Killing a session moves you to another session instead of closing the terminal.
+set -g detach-on-destroy off
+
+# prefix + r reloads this file.
+bind r source-file ~/.tmux.conf \; display-message "tmux.conf reloaded"
